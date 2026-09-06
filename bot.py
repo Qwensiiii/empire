@@ -9,7 +9,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Если нет .env, используем токен напрямую
 if not BOT_TOKEN:
-    BOT_TOKEN = "СЮДА_ВСТАВЬ_ТОКЕН_ОТ_BOTFATHER"
+    BOT_TOKEN = "8800841098:AAHIR4nwW_QAJR2BGqyaLJmWibaKL8dGdzg"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
