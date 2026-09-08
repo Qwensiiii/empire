@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Empire</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #1a1a2e; color: white; font-family: Arial; text-align: center; padding: 20px; }
+        .click-btn { width: 200px; height: 200px; border-radius: 50%; background: #ffd700; font-size: 40px; border: none; cursor: pointer; }
+        .balance { font-size: 28px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="balance">💰 <span id="balance">0</span></div>
+    <button class="click-btn" id="clickBtn">👆 ТАП</button>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        document.getElementById('clickBtn').onclick = function() {
+            tg.sendData(JSON.stringify({ action: 'click' }));
+        };
+        tg.onEvent('message', function(msg) {
+            try {
+                const data = JSON.parse(msg);
+                if (data.balance !== undefined) {
+                    document.getElementById('balance').textContent = data.balance.toFixed(2);
+                }
+            } catch(e) {}
+        });
+    </script>
+</body>
+</html>

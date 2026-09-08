@@ -1,0 +1,8 @@
+aiogram==3.4.1
+sqlalchemy==1.4.46
+python-dotenv==1.0.0
+apscheduler==3.10.4
+aiohttp==3.8.6
+pydantic==1.10.13
+pydantic-core==2.14.1
+typing-extensions==4.8.0
