@@ -4,21 +4,26 @@ import sqlite3
 import os
 import json
 import logging
+import threading
+import time
 from dotenv import load_dotenv
-from datetime import datetime
 
+# Загружаем переменные окружения
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
 
 if not TOKEN:
-    print("❌ ОШИБКА: BOT_TOKEN не найден!")
+    print("❌ ОШИБКА: BOT_TOKEN не найден в файле .env!")
     exit(1)
 
 bot = telebot.TeleBot(TOKEN)
 logging.basicConfig(level=logging.INFO)
 
-# База данных
-conn = sqlite3.connect('empire.db', check_same_thread=False)
+# ============================================
+# БАЗА ДАННЫХ (SQLite)
+# ============================================
+DB_LOCK = threading.Lock()
+conn = sqlite3.connect('empire.db', check_same_thread=False, timeout=30)
 cursor = conn.cursor()
 
 # Создаём таблицы
@@ -28,133 +33,133 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS users
                    click_power INTEGER DEFAULT 1,
                    total_clicks INTEGER DEFAULT 0,
                    total_earned REAL DEFAULT 0)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS businesses 
+                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   user_id INTEGER,
+                   name TEXT,
+                   emoji TEXT,
+                   price REAL,
+                   income_per_hour REAL)''')
 conn.commit()
 
 # ============================================
-# 1. КОМАНДА /start — отправляет Mini App
+# КЭШ (для быстрой работы)
 # ============================================
+cache = {}
+cache_time = {}
+
+def get_cached_user(user_id):
+    """Получает данные пользователя из кэша или БД"""
+    now = time.time()
+    if user_id in cache and (now - cache_time.get(user_id, 0)) < 10:
+        return cache[user_id]
+    
+    with DB_LOCK:
+        cursor.execute(
+            "SELECT balance, click_power, total_clicks, total_earned FROM users WHERE user_id = ?",
+            (user_id,)
+        )
+        row = cursor.fetchone()
+    
+    if row:
+        cache[user_id] = {
+            'balance': row[0],
+            'click_power': row[1],
+            'total_clicks': row[2],
+            'total_earned': row[3]
+        }
+        cache_time[user_id] = now
+        return cache[user_id]
+    return None
+
+# ============================================
+# КЛАВИАТУРА
+# ============================================
+def main_keyboard():
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    markup.add(
+        types.KeyboardButton('🏪 Бизнесы'),
+        types.KeyboardButton('📈 Акции'),
+        types.KeyboardButton('👤 Профиль'),
+        types.KeyboardButton('🎮 Mini App'),
+        types.KeyboardButton('🔄 Обновить')
+    )
+    return markup
+
+# ============================================
+# ОБРАБОТЧИКИ КОМАНД
+# ============================================
+
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
-    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
-    conn.commit()
     
-    # Кнопка для запуска Mini App
+    # Создаём пользователя, если его нет
+    with DB_LOCK:
+        cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+        conn.commit()
+    
+    user = get_cached_user(user_id)
+    
+    # Кнопка для открытия мини-приложения
+    webapp_url = "https://empire-one-iota.vercel.app/"
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(
-        "🎮 Играть", 
-        web_app=types.WebAppInfo(url="https://empire-git-main-silent24.vercel.app/"
+        "🎮 Играть",
+        web_app=types.WebAppInfo(url=webapp_url)
     ))
     
     bot.send_message(
         message.chat.id,
         f"🏢 *Business Empire*\n\n"
         f"Добро пожаловать, {message.from_user.first_name}!\n"
-        f"💰 Баланс: *100.00*\n"
-        f"👆 Сила клика: *1*\n\n"
-        f"👇 Нажмите кнопку, чтобы открыть игру!",
+        f"💰 Баланс: *{user['balance']:.2f}*\n"
+        f"👆 Сила клика: *{user['click_power']}*",
         reply_markup=markup,
         parse_mode='Markdown'
     )
-
-# ============================================
-# 2. ОБРАБОТКА ДАННЫХ ИЗ MINI APP
-# ============================================
-@bot.message_handler(content_types=['web_app_data'])
-def handle_web_app_data(message):
-    """Принимает данные из Mini App и обрабатывает"""
-    try:
-        data = json.loads(message.web_app_data.data)
-        action = data.get('action')
-        user_id = message.from_user.id
-        
-        logging.info(f"📥 Получены данные от {user_id}: {data}")
-        
-        if action == 'click':
-            # Получаем силу клика
-            cursor.execute("SELECT click_power FROM users WHERE user_id = ?", (user_id,))
-            result = cursor.fetchone()
-            if result:
-                power = result[0]
-                earned = power
-                
-                # Обновляем баланс
-                cursor.execute("""
-                    UPDATE users 
-                    SET balance = balance + ?, 
-                        total_clicks = total_clicks + 1, 
-                        total_earned = total_earned + ? 
-                    WHERE user_id = ?
-                """, (earned, earned, user_id))
-                conn.commit()
-                
-                # Получаем обновлённые данные
-                cursor.execute("""
-                    SELECT balance, click_power, total_clicks, total_earned 
-                    FROM users WHERE user_id = ?
-                """, (user_id,))
-                user_data = cursor.fetchone()
-                
-                if user_data:
-                    response = {
-                        'balance': user_data[0],
-                        'click_power': user_data[1],
-                        'total_clicks': user_data[2],
-                        'total_earned': user_data[3]
-                    }
-                    # Отправляем ответ в Mini App
-                    bot.send_message(
-                        user_id,
-                        json.dumps(response)
-                    )
-                    logging.info(f"✅ Баланс обновлён: {user_data[0]}")
-        
-        elif action == 'get_data':
-            # Получение всех данных пользователя
-            cursor.execute("""
-                SELECT balance, click_power, total_clicks, total_earned 
-                FROM users WHERE user_id = ?
-            """, (user_id,))
-            user_data = cursor.fetchone()
-            
-            if user_data:
-                response = {
-                    'balance': user_data[0],
-                    'click_power': user_data[1],
-                    'total_clicks': user_data[2],
-                    'total_earned': user_data[3]
-                }
-                bot.send_message(
-                    user_id,
-                    json.dumps(response)
-                )
-            else:
-                bot.send_message(user_id, json.dumps({'error': 'User not found'}))
-                
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON ошибка: {e}")
-        bot.send_message(message.from_user.id, json.dumps({'error': 'Invalid data format'}))
-    except Exception as e:
-        logging.error(f"Ошибка: {e}")
-        bot.send_message(message.from_user.id, json.dumps({'error': str(e)}))
-
-# ============================================
-# 3. КНОПКИ МЕНЮ
-# ============================================
-def main_menu():
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    markup.add(
-        types.KeyboardButton('🏪 Бизнесы'),
-        types.KeyboardButton('📈 Акции'),
-        types.KeyboardButton('👤 Профиль'),
-        types.KeyboardButton('🎮 Mini App')
+    
+    # Отправляем основную клавиатуру
+    bot.send_message(
+        message.chat.id,
+        "📋 Меню:",
+        reply_markup=main_keyboard()
     )
-    return markup
+
+# ============================================
+# ОБРАБОТЧИКИ КНОПОК
+# ============================================
+
+@bot.message_handler(func=lambda m: m.text == '🔄 Обновить')
+def refresh(message):
+    user = get_cached_user(message.from_user.id)
+    if user:
+        bot.send_message(
+            message.chat.id,
+            f"🔄 *Обновлено!*\n"
+            f"💰 Баланс: *{user['balance']:.2f}*\n"
+            f"👆 Сила клика: *{user['click_power']}*",
+            parse_mode='Markdown'
+        )
+
+@bot.message_handler(func=lambda m: m.text == '👤 Профиль')
+def profile(message):
+    user = get_cached_user(message.from_user.id)
+    if user:
+        bot.send_message(
+            message.chat.id,
+            f"👤 *Профиль*\n\n"
+            f"🆔 ID: `{message.from_user.id}`\n"
+            f"👤 Имя: {message.from_user.first_name}\n"
+            f"💰 Баланс: *{user['balance']:.2f}*\n"
+            f"👆 Сила клика: *{user['click_power']}*\n"
+            f"🔄 Кликов: *{user['total_clicks']}*\n"
+            f"📈 Заработано: *{user['total_earned']:.2f}*",
+            parse_mode='Markdown'
+        )
 
 @bot.message_handler(func=lambda m: m.text == '🏪 Бизнесы')
 def businesses(message):
-    user_id = message.from_user.id
-    
     business_list = [
         {'id': 1, 'name': 'Кофейня', 'emoji': '☕', 'price': 100, 'income': 10},
         {'id': 2, 'name': 'Ресторан', 'emoji': '🍽️', 'price': 500, 'income': 50},
@@ -167,7 +172,7 @@ def businesses(message):
     for b in business_list:
         markup.add(types.InlineKeyboardButton(
             f"{b['emoji']} {b['name']} - {b['price']}💰",
-            callback_data=f"buy_business_{b['id']}"
+            callback_data=f"buy_{b['id']}"
         ))
     
     bot.send_message(
@@ -177,10 +182,10 @@ def businesses(message):
         parse_mode='Markdown'
     )
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('buy_business_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('buy_'))
 def buy_business(call):
     user_id = call.from_user.id
-    business_id = int(call.data.split('_')[2])
+    business_id = int(call.data.split('_')[1])
     
     businesses = {
         1: {'name': 'Кофейня', 'emoji': '☕', 'price': 100, 'income': 10},
@@ -195,27 +200,39 @@ def buy_business(call):
         bot.answer_callback_query(call.id, "❌ Бизнес не найден")
         return
     
-    cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
-    balance = cursor.fetchone()[0]
+    user = get_cached_user(user_id)
+    if not user:
+        bot.answer_callback_query(call.id, "❌ Пользователь не найден")
+        return
     
-    if balance < business['price']:
+    if user['balance'] < business['price']:
         bot.answer_callback_query(call.id, f"❌ Нужно: {business['price']}💰")
         return
     
-    cursor.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", 
-                   (business['price'], user_id))
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS businesses 
-        (id INTEGER PRIMARY KEY AUTOINCREMENT,
-         user_id INTEGER,
-         name TEXT,
-         emoji TEXT,
-         price REAL,
-         income_per_hour REAL,
-         level INTEGER DEFAULT 1,
-         purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-    """, (user_id, business['name'], business['emoji'], business['price'], business['income']))
-    conn.commit()
+    with DB_LOCK:
+        cursor.execute(
+            "UPDATE users SET balance = balance - ? WHERE user_id = ?",
+            (business['price'], user_id)
+        )
+        cursor.execute(
+            "INSERT INTO businesses (user_id, name, emoji, price, income_per_hour) VALUES (?, ?, ?, ?, ?)",
+            (user_id, business['name'], business['emoji'], business['price'], business['income'])
+        )
+        conn.commit()
+        # Обновляем кэш
+        cursor.execute(
+            "SELECT balance, click_power, total_clicks, total_earned FROM users WHERE user_id = ?",
+            (user_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            cache[user_id] = {
+                'balance': row[0],
+                'click_power': row[1],
+                'total_clicks': row[2],
+                'total_earned': row[3]
+            }
+            cache_time[user_id] = time.time()
     
     bot.answer_callback_query(call.id, f"✅ Куплено {business['emoji']} {business['name']}!")
 
@@ -227,31 +244,13 @@ def shares(message):
         parse_mode='Markdown'
     )
 
-@bot.message_handler(func=lambda m: m.text == '👤 Профиль')
-def profile(message):
-    user_id = message.from_user.id
-    cursor.execute("SELECT balance, click_power, total_clicks, total_earned FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-    
-    if user:
-        bot.send_message(
-            message.chat.id,
-            f"👤 *Профиль*\n\n"
-            f"🆔 ID: `{user_id}`\n"
-            f"👤 Имя: {message.from_user.first_name}\n"
-            f"💰 Баланс: *{user[0]:.2f}*\n"
-            f"👆 Сила клика: *{user[1]}*\n"
-            f"🔄 Кликов: *{user[2]}*\n"
-            f"📈 Заработано: *{user[3]:.2f}*",
-            parse_mode='Markdown'
-        )
-
 @bot.message_handler(func=lambda m: m.text == '🎮 Mini App')
-def mini_app_button(message):
+def mini_app(message):
+    webapp_url = "https://empire-one-iota.vercel.app/"
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(
         "🎮 Открыть игру",
-        web_app=types.WebAppInfo(url="https://empire-ваш-проект.vercel.app/static/index.html")  # ЗАМЕНИТЕ на ваш URL
+        web_app=types.WebAppInfo(url=webapp_url)
     ))
     bot.send_message(
         message.chat.id,
@@ -260,11 +259,65 @@ def mini_app_button(message):
     )
 
 # ============================================
-# 4. ЗАПУСК
+# ОБРАБОТКА ДАННЫХ ИЗ MINI APP (САМОЕ ВАЖНОЕ!)
 # ============================================
-print("🚀 Бот Business Empire запущен!")
-print(f"🤖 Токен: {TOKEN[:10]}...")
-print("📱 Откройте Telegram и напишите /start")
-print("⏹️ Нажмите Ctrl+C для остановки")
+@bot.message_handler(content_types=['web_app_data'])
+def handle_web_app(message):
+    try:
+        data = json.loads(message.web_app_data.data)
+        action = data.get('action')
+        user_id = message.from_user.id
+        
+        print(f"📥 Получены данные от {user_id}: {data}")  # Лог в Termux
+        
+        if action == 'get_data':
+            user = get_cached_user(user_id)
+            if user:
+                bot.send_message(user_id, json.dumps(user))
+            return
+        
+        if action == 'click':
+            with DB_LOCK:
+                cursor.execute("SELECT click_power FROM users WHERE user_id = ?", (user_id,))
+                result = cursor.fetchone()
+                if not result:
+                    return
+                earned = result[0]
+                
+                cursor.execute("""
+                    UPDATE users 
+                    SET balance = balance + ?, 
+                        total_clicks = total_clicks + 1, 
+                        total_earned = total_earned + ? 
+                    WHERE user_id = ?
+                    RETURNING balance, click_power, total_clicks, total_earned
+                """, (earned, earned, user_id))
+                new_data = cursor.fetchone()
+                conn.commit()
+            
+            if new_data:
+                response = {
+                    'balance': new_data[0],
+                    'click_power': new_data[1],
+                    'total_clicks': new_data[2],
+                    'total_earned': new_data[3]
+                }
+                cache[user_id] = response
+                cache_time[user_id] = time.time()
+                bot.send_message(user_id, json.dumps(response))
+                print(f"✅ Баланс обновлён: {new_data[0]}")
+                
+    except Exception as e:
+        logging.error(f"Ошибка: {e}")
+        print(f"❌ Ошибка: {e}")
 
-bot.polling(none_stop=True)
+# ============================================
+# ЗАПУСК
+# ============================================
+if __name__ == "__main__":
+    print("🚀 Бот Business Empire запущен!")
+    print(f"🤖 Токен: {TOKEN[:10]}...")
+    print("📱 Откройте Telegram и напишите /start")
+    print("⏹️ Нажмите Ctrl+C для остановки")
+    
+    bot.polling(none_stop=True)
