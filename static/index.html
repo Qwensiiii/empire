@@ -47,6 +47,7 @@
             border-radius: 10px;
             font-size: 12px;
             color: #aaa;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -115,7 +116,7 @@
             }
         }
         
-        // Обработка входящих сообщений
+        // Обработка входящих сообщений от бота
         tg.onEvent('message', function(msg) {
             console.log('📨 Получено сообщение:', msg);
             try {
@@ -144,10 +145,10 @@
             loadData();
         }, 500);
         
-        // Автообновление
+        // Автообновление каждые 10 секунд
         setInterval(loadData, 10000);
         
-        // Показываем статус Telegram
+        // Показываем статус
         statusEl.textContent = '✅ Telegram WebApp готов!';
         statusEl.style.color = '#4caf50';
         
