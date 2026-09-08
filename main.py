@@ -43,7 +43,7 @@ def start(message):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(
         "🎮 Играть", 
-        web_app=types.WebAppInfo(url="https://empire-one-iota.vercel.app/"
+        web_app=types.WebAppInfo(url="https://empire-git-main-silent24.vercel.app/"
     ))
     
     bot.send_message(
