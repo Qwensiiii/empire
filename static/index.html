@@ -1,466 +1,59 @@
+
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Empire</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-
-        body {
-            background: linear-gradient(145deg, #0f0c29, #302b63, #24243e);
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px 16px 30px;
-            overflow-x: hidden;
-        }
-
-        /* Шапка */
-        .header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 18px;
-            background: rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 24px;
-        }
-
-        .balance-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .balance-icon {
-            font-size: 22px;
-        }
-        .balance-value {
-            font-size: 26px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #f7971e, #ffd200);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .power-wrap {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(255, 255, 255, 0.08);
-            padding: 6px 14px;
-            border-radius: 30px;
-        }
-        .power-icon {
-            font-size: 16px;
-        }
-        .power-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: #a8b5ff;
-        }
-
-        /* Кнопка клика */
-        .click-area {
-            position: relative;
-            margin: 10px 0 25px;
-        }
-
-        .click-btn {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            border: none;
-            background: radial-gradient(circle at 35% 35%, #f7971e, #e67e22);
-            font-size: 60px;
-            font-weight: 900;
-            color: #1a1a2e;
-            cursor: pointer;
-            box-shadow: 
-                0 12px 40px rgba(247, 151, 30, 0.35),
-                inset 0 -4px 12px rgba(0,0,0,0.2),
-                inset 0 4px 12px rgba(255,255,255,0.3);
-            transition: transform 0.08s ease, box-shadow 0.15s ease;
-            touch-action: manipulation;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-        }
-
-        .click-btn:active {
-            transform: scale(0.92);
-            box-shadow: 0 4px 20px rgba(247, 151, 30, 0.5);
-        }
-
-        .click-btn .emoji {
-            font-size: 60px;
-            line-height: 1;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
-        }
-        .click-btn .label {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: rgba(26, 26, 46, 0.8);
-        }
-
-        /* Пульсация */
-        .click-btn::after {
-            content: '';
-            position: absolute;
-            inset: -6px;
-            border-radius: 50%;
-            border: 2px solid rgba(247, 151, 30, 0.2);
-            animation: pulse-ring 2s ease-out infinite;
-        }
-        @keyframes pulse-ring {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.3); opacity: 0; }
-        }
-
-        /* Всплывающие +N */
-        .float-text {
-            position: fixed;
-            pointer-events: none;
-            font-size: 28px;
-            font-weight: 900;
-            color: #ffd700;
-            text-shadow: 0 2px 20px rgba(255, 215, 0, 0.5);
-            animation: float-up 1s ease-out forwards;
-            z-index: 999;
-        }
-        @keyframes float-up {
-            0% { opacity: 1; transform: translateY(0) scale(0.8); }
-            100% { opacity: 0; transform: translateY(-120px) scale(1.4); }
-        }
-
-        /* Бонус */
-        .float-text.bonus {
-            color: #ff6bff;
-            text-shadow: 0 2px 30px rgba(255, 107, 255, 0.6);
-            font-size: 32px;
-        }
-
-        /* Статистика */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            width: 100%;
-            max-width: 380px;
-            margin-top: 10px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            padding: 14px 10px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            text-align: center;
-            transition: transform 0.15s;
-        }
-        .stat-card:active {
-            transform: scale(0.96);
-        }
-
-        .stat-value {
-            font-size: 22px;
-            font-weight: 800;
-            color: #ffffff;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 4px;
-            letter-spacing: 0.5px;
-        }
-
-        /* Кнопка обновления */
-        .refresh-btn {
-            margin-top: 20px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.6);
-            padding: 10px 30px;
-            border-radius: 30px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            touch-action: manipulation;
-        }
-        .refresh-btn:active {
-            background: rgba(255, 255, 255, 0.12);
-            transform: scale(0.96);
-        }
-
-        /* Уведомление */
-        .toast {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(20px);
-            padding: 12px 24px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            color: #fff;
-            font-weight: 600;
-            font-size: 15px;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            pointer-events: none;
-            text-align: center;
-            max-width: 90%;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-        }
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        .toast.hide {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-20px);
-        }
-
-        /* Адаптив */
-        @media (max-width: 420px) {
-            .click-btn {
-                width: 170px;
-                height: 170px;
-            }
-            .click-btn .emoji {
-                font-size: 48px;
-            }
-            .balance-value {
-                font-size: 22px;
-            }
-        }
-
-        /* Скелетон */
-        .skeleton {
-            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.05) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
+        body { background: #1a1a2e; color: white; font-family: Arial; text-align: center; padding: 20px; }
+        .click-btn { width: 200px; height: 200px; border-radius: 50%; background: #ffd700; font-size: 40px; border: none; cursor: pointer; }
+        .balance { font-size: 28px; margin: 20px 0; }
     </style>
 </head>
 <body>
-
-    <!-- Toast уведомление -->
-    <div class="toast hide" id="toast"></div>
-
-    <!-- Шапка -->
-    <div class="header">
-        <div class="balance-wrap">
-            <span class="balance-icon">💰</span>
-            <span class="balance-value" id="balanceDisplay">0.00</span>
-        </div>
-        <div class="power-wrap">
-            <span class="power-icon">⚡</span>
-            <span class="power-value" id="powerDisplay">1</span>
-        </div>
-    </div>
-
-    <!-- Кнопка клика -->
-    <div class="click-area">
-        <button class="click-btn" id="clickBtn">
-            <span class="emoji">💎</span>
-            <span class="label">ТАП</span>
-        </button>
-    </div>
-
-    <!-- Статистика -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value" id="totalClicksDisplay">0</div>
-            <div class="stat-label">🔄 Всего кликов</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="totalEarnedDisplay">0.00</div>
-            <div class="stat-label">📈 Всего заработано</div>
-        </div>
-    </div>
-
-    <!-- Кнопка обновления -->
-    <button class="refresh-btn" id="refreshBtn">🔄 Обновить данные</button>
-
+    <div class="balance">💰 <span id="balance">0</span></div>
+    <button class="click-btn" id="clickBtn">👆 ТАП</button>
     <script>
-        // --- Инициализация Telegram WebApp ---
+        // Инициализация Mini App
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // --- DOM элементы ---
-        const balanceEl = document.getElementById('balanceDisplay');
-        const powerEl = document.getElementById('powerDisplay');
-        const totalClicksEl = document.getElementById('totalClicksDisplay');
-        const totalEarnedEl = document.getElementById('totalEarnedDisplay');
-        const clickBtn = document.getElementById('clickBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const toast = document.getElementById('toast');
-
-        // --- Состояние ---
-        let balance = 0;
-        let clickPower = 1;
-        let totalClicks = 0;
-        let totalEarned = 0;
-        let isCooldown = false;
-        let toastTimeout = null;
-
-        // --- Вспомогательные функции ---
-        function showToast(text, isError = false) {
-            toast.textContent = text;
-            toast.style.borderColor = isError ? 'rgba(255,80,80,0.3)' : 'rgba(255,215,0,0.2)';
-            toast.className = 'toast show';
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.className = 'toast hide';
-            }, 2500);
-        }
-
-        function updateUI(data) {
+        // Функция обновления баланса на экране
+        function updateBalance(data) {
             if (data.balance !== undefined) {
-                balance = data.balance;
-                balanceEl.textContent = balance.toFixed(2);
-            }
-            if (data.click_power !== undefined) {
-                clickPower = data.click_power;
-                powerEl.textContent = clickPower;
-            }
-            if (data.total_clicks !== undefined) {
-                totalClicks = data.total_clicks;
-                totalClicksEl.textContent = totalClicks;
-            }
-            if (data.total_earned !== undefined) {
-                totalEarned = data.total_earned;
-                totalEarnedEl.textContent = totalEarned.toFixed(2);
+                document.getElementById('balance').textContent = data.balance.toFixed(2);
             }
         }
 
-        function showFloatingText(x, y, text, isBonus = false) {
-            const el = document.createElement('div');
-            el.className = 'float-text' + (isBonus ? ' bonus' : '');
-            el.textContent = text;
-            el.style.left = (x - 40) + 'px';
-            el.style.top = (y - 20) + 'px';
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 1000);
-        }
+        // Кнопка "ТАП" отправляет клик боту
+        document.getElementById('clickBtn').onclick = function() {
+            tg.sendData(JSON.stringify({ action: 'click' }));
+        };
 
-        // --- Загрузка данных ---
-        function loadData() {
-            tg.sendData(JSON.stringify({ action: 'get_data' }));
-        }
+        // Запрос текущего баланса при загрузке
+        tg.sendData(JSON.stringify({ action: 'get_data' }));
 
-        // --- Обработка клика ---
-        clickBtn.addEventListener('click', function(e) {
-            if (isCooldown) return;
-            isCooldown = true;
-
-            // Анимация
-            const rect = this.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-
-            const earned = clickPower;
-            const isBonus = Math.random() < 0.15;
-            const bonusText = isBonus ? ` ✨x${Math.floor(Math.random() * 3 + 2)}` : '';
-            showFloatingText(cx, cy, `+${earned}${bonusText}`, isBonus);
-
-            // Вибрация
-            if (navigator.vibrate) navigator.vibrate(10);
-
-            // Отправка
-            tg.sendData(JSON.stringify({ 
-                action: 'click',
-                count: 1
-            }));
-
-            // Оптимистичное обновление
-            const bonusMult = isBonus ? Math.floor(Math.random() * 3 + 2) : 1;
-            const earnedFinal = earned * bonusMult;
-            balance += earnedFinal;
-            balanceEl.textContent = balance.toFixed(2);
-            totalClicks += 1;
-            totalClicksEl.textContent = totalClicks;
-            totalEarned += earnedFinal;
-            totalEarnedEl.textContent = totalEarned.toFixed(2);
-
-            setTimeout(() => {
-                isCooldown = false;
-            }, 120);
-        });
-
-        // --- Кнопка обновления ---
-        refreshBtn.addEventListener('click', function() {
-            loadData();
-            showToast('🔄 Обновление...');
-        });
-
-        // --- Обработка ответов от бота ---
+        // Обработка ответов от бота
         tg.onEvent('message', function(msg) {
             try {
                 const data = JSON.parse(msg);
-                if (data.balance !== undefined || data.click_power !== undefined) {
-                    updateUI(data);
-                } else if (typeof msg === 'string' && msg.length < 200) {
-                    // Текстовое сообщение (уведомление)
-                    showToast(msg);
+                if (data.balance !== undefined) {
+                    updateBalance(data);
                 }
-            } catch (e) {
-                // Если не JSON — показываем как текст
-                if (typeof msg === 'string' && msg.length < 200) {
-                    showToast(msg);
-                }
+            } catch(e) {
+                console.log('Получено сообщение:', msg);
             }
         });
 
-        // --- Обработка ошибок ---
-        tg.onEvent('error', function(err) {
-            console.error('WebApp error:', err);
-            showToast('⚠️ Ошибка соединения', true);
-        });
+        // Автообновление баланса каждые 5 секунд
+        setInterval(() => {
+            tg.sendData(JSON.stringify({ action: 'get_data' }));
+        }, 5000);
 
-        // --- Загружаем данные при старте ---
-        loadData();
-
-        // --- Автообновление каждые 10 секунд ---
-        setInterval(loadData, 10000);
-
-        // --- Поддержка Main Button ---
-        tg.MainButton.setText('👆 ТАП');
-        tg.MainButton.onClick(function() {
-            clickBtn.click();
-        });
-        tg.MainButton.show();
-
-        console.log('🎮 Business Empire Mini App загружен!');
+        console.log('🎮 Mini App загружен!');
     </script>
 </body>
 </html>
