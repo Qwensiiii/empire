@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,53 +6,154 @@
     <title>Business Empire</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a2e; color: white; font-family: Arial; text-align: center; padding: 20px; }
-        .click-btn { width: 200px; height: 200px; border-radius: 50%; background: #ffd700; font-size: 40px; border: none; cursor: pointer; }
-        .balance { font-size: 28px; margin: 20px 0; }
+        body { 
+            background: #1a1a2e; 
+            color: white; 
+            font-family: Arial; 
+            text-align: center; 
+            padding: 20px;
+            margin: 0;
+        }
+        .balance {
+            font-size: 48px;
+            margin: 30px 0;
+            color: #ffd700;
+        }
+        .click-btn {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f7971e, #ffd200);
+            font-size: 40px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 40px rgba(255, 210, 0, 0.3);
+            transition: transform 0.1s;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .click-btn:active {
+            transform: scale(0.92);
+        }
+        .info {
+            margin-top: 20px;
+            color: #888;
+            font-size: 14px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            font-size: 12px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
-    <div class="balance">💰 <span id="balance">0</span></div>
-    <button class="click-btn" id="clickBtn">👆 ТАП</button>
+    <div class="balance">💰 <span id="balance">0.00</span></div>
+    
+    <button class="click-btn" id="clickBtn">
+        👆 ТАП
+    </button>
+    
+    <div class="info">⚡ Сила клика: <span id="power">1</span></div>
+    
+    <div class="status" id="status">🔄 Подключение...</div>
+
     <script>
-        // Инициализация Mini App
+        console.log('🚀 Загрузка Mini App...');
+        
+        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-
-        // Функция обновления баланса на экране
-        function updateBalance(data) {
+        
+        const statusEl = document.getElementById('status');
+        const balanceEl = document.getElementById('balance');
+        const powerEl = document.getElementById('power');
+        
+        // Функция обновления интерфейса
+        function updateUI(data) {
+            console.log('📊 Получены данные:', data);
             if (data.balance !== undefined) {
-                document.getElementById('balance').textContent = data.balance.toFixed(2);
+                balanceEl.textContent = data.balance.toFixed(2);
+                statusEl.textContent = '✅ Баланс обновлён: ' + data.balance.toFixed(2);
+                statusEl.style.color = '#4caf50';
+            }
+            if (data.click_power !== undefined) {
+                powerEl.textContent = data.click_power;
             }
         }
-
-        // Кнопка "ТАП" отправляет клик боту
+        
+        // Кнопка "ТАП"
         document.getElementById('clickBtn').onclick = function() {
-            tg.sendData(JSON.stringify({ action: 'click' }));
+            console.log('👆 Клик!');
+            statusEl.textContent = '⏳ Отправка клика...';
+            statusEl.style.color = '#ffd700';
+            
+            try {
+                tg.sendData(JSON.stringify({ 
+                    action: 'click',
+                    count: 1 
+                }));
+                console.log('✅ Данные отправлены');
+            } catch(e) {
+                console.error('❌ Ошибка отправки:', e);
+                statusEl.textContent = '❌ Ошибка: ' + e.message;
+                statusEl.style.color = '#ff4444';
+            }
         };
-
-        // Запрос текущего баланса при загрузке
-        tg.sendData(JSON.stringify({ action: 'get_data' }));
-
-        // Обработка ответов от бота
+        
+        // Функция запроса данных
+        function loadData() {
+            console.log('🔄 Запрос данных...');
+            try {
+                tg.sendData(JSON.stringify({ action: 'get_data' }));
+            } catch(e) {
+                console.error('❌ Ошибка запроса:', e);
+            }
+        }
+        
+        // Обработка входящих сообщений
         tg.onEvent('message', function(msg) {
+            console.log('📨 Получено сообщение:', msg);
             try {
                 const data = JSON.parse(msg);
                 if (data.balance !== undefined) {
-                    updateBalance(data);
+                    updateUI(data);
+                } else if (typeof msg === 'string' && msg.length < 200) {
+                    statusEl.textContent = '📨 ' + msg;
+                    statusEl.style.color = '#4caf50';
                 }
             } catch(e) {
-                console.log('Получено сообщение:', msg);
+                console.log('⚠️ Не JSON:', msg);
+                statusEl.textContent = '📨 ' + msg;
             }
         });
-
-        // Автообновление баланса каждые 5 секунд
-        setInterval(() => {
-            tg.sendData(JSON.stringify({ action: 'get_data' }));
-        }, 5000);
-
+        
+        // Обработка ошибок
+        tg.onEvent('error', function(err) {
+            console.error('❌ WebApp ошибка:', err);
+            statusEl.textContent = '❌ Ошибка: ' + (err.message || 'неизвестная');
+            statusEl.style.color = '#ff4444';
+        });
+        
+        // Загружаем данные при старте
+        setTimeout(() => {
+            loadData();
+        }, 500);
+        
+        // Автообновление
+        setInterval(loadData, 10000);
+        
+        // Показываем статус Telegram
+        statusEl.textContent = '✅ Telegram WebApp готов!';
+        statusEl.style.color = '#4caf50';
+        
         console.log('🎮 Mini App загружен!');
+        console.log('📱 Telegram версия:', tg.version);
+        console.log('👤 Пользователь:', tg.initDataUnsafe?.user?.id || 'неизвестно');
     </script>
 </body>
 </html>
